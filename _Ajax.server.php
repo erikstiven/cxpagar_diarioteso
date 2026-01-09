@@ -2078,6 +2078,7 @@ function agrega_modifica_grid_dir($nTipo = 0, $aForm = '', $id = '', $idempresa 
 						$aDataDiar[$contd][$aLabelDiar[14]] = $cont;
 					}
 				} // fin foreach
+				unset($_SESSION['U_FACTURA']);
 			} // fin if
 
 		}
@@ -2704,6 +2705,10 @@ function elimina_detalle_dir($id = null, $idempresa, $idsucursal, $id_di = '', $
 	$aDataGrid = $_SESSION['aDataGirdDir'];
 	$contador  = count($aDataGrid);
 	//$oReturn->alert('DIR '.$contador);
+	$linked_di = null;
+	if (isset($aDataGrid[$id]) && isset($aDataGrid[$id]['DI'])) {
+		$linked_di = $aDataGrid[$id]['DI'];
+	}
 	if ($contador > 1) {
 		unset($aDataGrid[$id]);
 		$aDataGrid = array_values($aDataGrid);
@@ -2714,6 +2719,11 @@ function elimina_detalle_dir($id = null, $idempresa, $idsucursal, $id_di = '', $
 			foreach ($aValues as $aVal) {
 				if ($aux == 0) {
 					$aDatos[$cont][$aLabelGrid[$aux]] = '<div align="right">' . ($cont + 1) . '</div>';
+				} elseif ($aux == 14 && $linked_di !== null) {
+					if (is_numeric($aVal) && $aVal > $linked_di) {
+						$aVal = $aVal - 1;
+					}
+					$aDatos[$cont][$aLabelGrid[$aux]] = $aVal;
 				} elseif ($aux == 12) {
 					$aDatos[$cont][$aLabelGrid[$aux]] = '<div align="center">
 																			<img src="' . $_COOKIE['JIREH_IMAGENES'] . 'iconos/pencil.png"
@@ -2756,8 +2766,13 @@ function elimina_detalle_dir($id = null, $idempresa, $idsucursal, $id_di = '', $
 	$contador   = count($aDataGrid);
 	//$oReturn->alert('DI '.$contador);
 	unset($aDatos);
+	if ($linked_di === null) {
+		$linked_di = $id_di;
+	}
 	if ($contador > 1) {
-		unset($aDataGrid[$id_di]);
+		if ($linked_di !== null && $linked_di !== '') {
+			unset($aDataGrid[$linked_di]);
+		}
 		$aDataGrid = array_values($aDataGrid);
 		$cont = 0;
 		foreach ($aDataGrid as $aValues) {
@@ -4112,6 +4127,26 @@ function guardar($aForm = '', $factcheq = '', $lisfact = '', $codModu='')
 
 	$debito_total     = $aForm['debito_total'];
 	$credito_total     = $aForm['credito_total'];
+	$debito_total_calc = 0;
+	$credito_total_calc = 0;
+	foreach ($aDataDiar as $aValues) {
+		$aux = 0;
+		foreach ($aValues as $aVal) {
+			if ($aux == 5) {
+				$debito_total_calc += $aVal;
+			} elseif ($aux == 6) {
+				$credito_total_calc += $aVal;
+			}
+			$aux++;
+		}
+	}
+	$debito_total_calc = round($debito_total_calc, 2);
+	$credito_total_calc = round($credito_total_calc, 2);
+	$debito_total = $debito_total_calc;
+	$credito_total = $credito_total_calc;
+	if (round($asto_val, 2) !== $debito_total_calc) {
+		$asto_val = $debito_total_calc;
+	}
 
 	if (empty($clpv_cod)) {
 		$clpv_cod = 0;
@@ -4186,7 +4221,7 @@ function guardar($aForm = '', $factcheq = '', $lisfact = '', $codModu='')
 				$user_ifx,
 				'',
 				$clpv_nom,
-				0,
+				$asto_val,
 				$fecha_mov,
 				$deta_asto,
 				$secu_dia,
@@ -4404,7 +4439,7 @@ function guardar($aForm = '', $factcheq = '', $lisfact = '', $codModu='')
 			if (count($aDataDiar) > 0) {
 				$x = 1;
 				$j = 1;
-				$total = 0;
+				$total = $debito_total_calc;
 				foreach ($aDataDiar as $aValues) {
 					$aux = 0;
 					foreach ($aValues as $aVal) {
@@ -4422,7 +4457,6 @@ function guardar($aForm = '', $factcheq = '', $lisfact = '', $codModu='')
 							$debito = $aVal;
 						} elseif ($aux == 6) {
 							$credito = $aVal;
-							$total += $debito;
 						} elseif ($aux == 7) {
 							$debito_ext = $aVal;
 						} elseif ($aux == 8) {
@@ -4483,6 +4517,7 @@ function guardar($aForm = '', $factcheq = '', $lisfact = '', $codModu='')
 			$oIfx->QueryT($sql);
 
 			$oReturn->assign("asto_cod", "value", $secu_asto);
+			$oReturn->assign("valor", "value", $asto_val);
 			$oReturn->assign("compr_cod", "value", $secu_asto);
 
 			// ASIENTOS 
